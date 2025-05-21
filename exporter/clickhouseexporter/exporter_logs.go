@@ -71,21 +71,21 @@ func (e *logsExporter) pushLogsData(ctx context.Context, ld plog.Logs) error {
 			_ = statement.Close()
 		}()
 
-		for i := 0; i < ld.ResourceLogs().Len(); i++ {
+		for i := range ld.ResourceLogs().Len() {
 			logs := ld.ResourceLogs().At(i)
 			res := logs.Resource()
 			resURL := logs.SchemaUrl()
 			resAttr := internal.AttributesToMap(res.Attributes())
 			serviceName := internal.GetServiceName(res.Attributes())
 
-			for j := 0; j < logs.ScopeLogs().Len(); j++ {
+			for j := range logs.ScopeLogs().Len() {
 				rs := logs.ScopeLogs().At(j).LogRecords()
 				scopeURL := logs.ScopeLogs().At(j).SchemaUrl()
 				scopeName := logs.ScopeLogs().At(j).Scope().Name()
 				scopeVersion := logs.ScopeLogs().At(j).Scope().Version()
 				scopeAttr := internal.AttributesToMap(logs.ScopeLogs().At(j).Scope().Attributes())
 
-				for k := 0; k < rs.Len(); k++ {
+				for k := range rs.Len() {
 					r := rs.At(k)
 
 					timestamp := r.Timestamp()
@@ -139,20 +139,17 @@ CREATE TABLE IF NOT EXISTS %s %s (
 	ServiceName LowCardinality(String) CODEC(ZSTD(1)),
 	Body String CODEC(ZSTD(1)),
 	ResourceSchemaUrl LowCardinality(String) CODEC(ZSTD(1)),
-	ResourceAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
+	ResourceAttributes JSON,
 	ScopeSchemaUrl LowCardinality(String) CODEC(ZSTD(1)),
 	ScopeName String CODEC(ZSTD(1)),
 	ScopeVersion LowCardinality(String) CODEC(ZSTD(1)),
-	ScopeAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-	LogAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
+	ScopeAttributes JSON,
+	LogAttributes JSON,
 
 	INDEX idx_trace_id TraceId TYPE bloom_filter(0.001) GRANULARITY 1,
-	INDEX idx_res_attr_key mapKeys(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_res_attr_value mapValues(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_scope_attr_key mapKeys(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_scope_attr_value mapValues(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_log_attr_key mapKeys(LogAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_log_attr_value mapValues(LogAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
+
+
+
 	INDEX idx_body Body TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 8
 ) ENGINE = %s
 PARTITION BY toDate(TimestampTime)

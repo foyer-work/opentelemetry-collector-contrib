@@ -119,7 +119,7 @@ func convertExemplars(exemplars pmetric.ExemplarSlice) (clickhouse.ArraySet, cli
 		traceIDs clickhouse.ArraySet
 		spanIDs  clickhouse.ArraySet
 	)
-	for i := 0; i < exemplars.Len(); i++ {
+	for i := range exemplars.Len() {
 		exemplar := exemplars.At(i)
 		attrs = append(attrs, AttributesToMap(exemplar.FilteredAttributes()))
 		times = append(times, exemplar.Timestamp().AsTime())
@@ -169,9 +169,9 @@ func getValue(intValue int64, floatValue float64, dataType any) float64 {
 }
 
 func AttributesToMap(attributes pcommon.Map) column.IterableOrderedMap {
-	return orderedmap.CollectN(func(yield func(string, string) bool) {
+	return orderedmap.CollectN(func(yield func(string, any) bool) {
 		for k, v := range attributes.All() {
-			yield(k, v.AsString())
+			yield(strings.ReplaceAll(k, ".", "_"), v.AsRaw())
 		}
 	}, attributes.Len())
 }
@@ -198,7 +198,7 @@ func convertValueAtQuantile(valueAtQuantile pmetric.SummaryDataPointValueAtQuant
 		quantiles clickhouse.ArraySet
 		values    clickhouse.ArraySet
 	)
-	for i := 0; i < valueAtQuantile.Len(); i++ {
+	for i := range valueAtQuantile.Len() {
 		value := valueAtQuantile.At(i)
 		quantiles = append(quantiles, value.Quantile())
 		values = append(values, value.Value())
@@ -225,7 +225,7 @@ func doWithTx(ctx context.Context, db *sql.DB, fn func(tx *sql.Tx) error) error 
 
 func newPlaceholder(count int) *string {
 	var b strings.Builder
-	for i := 0; i < count; i++ {
+	for range count {
 		b.WriteString(",?")
 	}
 	b.WriteString("),")

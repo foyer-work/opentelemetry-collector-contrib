@@ -18,38 +18,32 @@ import (
 const (
 	// language=ClickHouse SQL
 	createSumTableSQL = `
-CREATE TABLE IF NOT EXISTS %s %s (
-    ResourceAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-    ResourceSchemaUrl String CODEC(ZSTD(1)),
-    ScopeName String CODEC(ZSTD(1)),
-    ScopeVersion String CODEC(ZSTD(1)),
-    ScopeAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-    ScopeDroppedAttrCount UInt32 CODEC(ZSTD(1)),
-    ScopeSchemaUrl String CODEC(ZSTD(1)),
-    ServiceName LowCardinality(String) CODEC(ZSTD(1)),
-    MetricName String CODEC(ZSTD(1)),
-    MetricDescription String CODEC(ZSTD(1)),
-    MetricUnit String CODEC(ZSTD(1)),
-    Attributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-	StartTimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),
-	TimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),
-	Value Float64 CODEC(ZSTD(1)),
-	Flags UInt32  CODEC(ZSTD(1)),
-    Exemplars Nested (
-		FilteredAttributes Map(LowCardinality(String), String),
-		TimeUnix DateTime64(9),
-		Value Float64,
-		SpanId String,
-		TraceId String
-    ) CODEC(ZSTD(1)),
-    AggregationTemporality Int32 CODEC(ZSTD(1)),
-	IsMonotonic Boolean CODEC(Delta, ZSTD(1)),
-	INDEX idx_res_attr_key mapKeys(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_res_attr_value mapValues(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_scope_attr_key mapKeys(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_scope_attr_value mapValues(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_attr_key mapKeys(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_attr_value mapValues(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1
+	CREATE TABLE IF NOT EXISTS %s %s (
+		ResourceAttributes JSON,
+		ResourceSchemaUrl String CODEC(ZSTD(1)),
+		ScopeName String CODEC(ZSTD(1)),
+		ScopeVersion String CODEC(ZSTD(1)),
+		ScopeAttributes JSON,
+		ScopeDroppedAttrCount UInt32 CODEC(ZSTD(1)),
+		ScopeSchemaUrl String CODEC(ZSTD(1)),
+		ServiceName LowCardinality(String) CODEC(ZSTD(1)),
+		MetricName String CODEC(ZSTD(1)),
+		MetricDescription String CODEC(ZSTD(1)),
+		MetricUnit String CODEC(ZSTD(1)),
+		Attributes JSON,
+		StartTimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),
+		TimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),
+		Value Float64 CODEC(ZSTD(1)),
+		Flags UInt32  CODEC(ZSTD(1)),
+		Exemplars Nested (
+			FilteredAttributes JSON,
+			TimeUnix DateTime64(9),
+			Value Float64,
+			SpanId String,
+			TraceId String
+		) CODEC(ZSTD(1)),
+		AggregationTemporality Int32 CODEC(ZSTD(1)),
+		IsMonotonic Boolean CODEC(Delta, ZSTD(1)),
 ) ENGINE = %s
 %s
 PARTITION BY toDate(TimeUnix)
@@ -117,7 +111,7 @@ func (s *sumMetrics) insert(ctx context.Context, db *sql.DB) error {
 			scopeAttr := AttributesToMap(model.metadata.ScopeInstr.Attributes())
 			serviceName := GetServiceName(model.metadata.ResAttr)
 
-			for i := 0; i < model.sum.DataPoints().Len(); i++ {
+			for i := range model.sum.DataPoints().Len() {
 				dp := model.sum.DataPoints().At(i)
 				attrs, times, values, traceIDs, spanIDs := convertExemplars(dp.Exemplars())
 				_, err = statement.ExecContext(ctx,

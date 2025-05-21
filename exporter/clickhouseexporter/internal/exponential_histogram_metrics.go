@@ -19,45 +19,39 @@ const (
 	// language=ClickHouse SQL
 	createExpHistogramTableSQL = `
 CREATE TABLE IF NOT EXISTS %s %s (
-    ResourceAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-    ResourceSchemaUrl String CODEC(ZSTD(1)),
-    ScopeName String CODEC(ZSTD(1)),
-    ScopeVersion String CODEC(ZSTD(1)),
-    ScopeAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-    ScopeDroppedAttrCount UInt32 CODEC(ZSTD(1)),
-    ScopeSchemaUrl String CODEC(ZSTD(1)),
-    ServiceName LowCardinality(String) CODEC(ZSTD(1)),
-    MetricName String CODEC(ZSTD(1)),
-    MetricDescription String CODEC(ZSTD(1)),
-    MetricUnit String CODEC(ZSTD(1)),
-    Attributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
+	ResourceAttributes JSON,
+	ResourceSchemaUrl String CODEC(ZSTD(1)),
+	ScopeName String CODEC(ZSTD(1)),
+	ScopeVersion String CODEC(ZSTD(1)),
+	ScopeAttributes JSON,
+	ScopeDroppedAttrCount UInt32 CODEC(ZSTD(1)),
+	ScopeSchemaUrl String CODEC(ZSTD(1)),
+	ServiceName LowCardinality(String) CODEC(ZSTD(1)),
+	MetricName String CODEC(ZSTD(1)),
+	MetricDescription String CODEC(ZSTD(1)),
+	MetricUnit String CODEC(ZSTD(1)),
+	Attributes JSON,
 	StartTimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),
 	TimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),
-    Count UInt64 CODEC(Delta, ZSTD(1)),
-    Sum Float64 CODEC(ZSTD(1)),
-    Scale Int32 CODEC(ZSTD(1)),
-    ZeroCount UInt64 CODEC(ZSTD(1)),
+	Count UInt64 CODEC(Delta, ZSTD(1)),
+	Sum Float64 CODEC(ZSTD(1)),
+	Scale Int32 CODEC(ZSTD(1)),
+	ZeroCount UInt64 CODEC(ZSTD(1)),
 	PositiveOffset Int32 CODEC(ZSTD(1)),
 	PositiveBucketCounts Array(UInt64) CODEC(ZSTD(1)),
 	NegativeOffset Int32 CODEC(ZSTD(1)),
 	NegativeBucketCounts Array(UInt64) CODEC(ZSTD(1)),
 	Exemplars Nested (
-		FilteredAttributes Map(LowCardinality(String), String),
+		FilteredAttributes JSON,
 		TimeUnix DateTime64(9),
 		Value Float64,
 		SpanId String,
 		TraceId String
-    ) CODEC(ZSTD(1)),
-    Flags UInt32  CODEC(ZSTD(1)),
-    Min Float64 CODEC(ZSTD(1)),
-    Max Float64 CODEC(ZSTD(1)),
-		AggregationTemporality Int32 CODEC(ZSTD(1)),
-	INDEX idx_res_attr_key mapKeys(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_res_attr_value mapValues(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_scope_attr_key mapKeys(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_scope_attr_value mapValues(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_attr_key mapKeys(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-	INDEX idx_attr_value mapValues(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1
+	) CODEC(ZSTD(1)),
+	Flags UInt32  CODEC(ZSTD(1)),
+	Min Float64 CODEC(ZSTD(1)),
+	Max Float64 CODEC(ZSTD(1)),
+	AggregationTemporality Int32 CODEC(ZSTD(1)),
 ) ENGINE = %s
 %s
 PARTITION BY toDate(TimeUnix)
@@ -78,25 +72,25 @@ SETTINGS index_granularity=8192, ttl_only_drop_parts = 1;
     MetricDescription,
     MetricUnit,
     Attributes,
-	StartTimeUnix,
-	TimeUnix,
-	Count,
-	Sum,
+		StartTimeUnix,
+		TimeUnix,
+		Count,
+		Sum,
     Scale,
     ZeroCount,
-	PositiveOffset,
-	PositiveBucketCounts,
-	NegativeOffset,
-	NegativeBucketCounts,
+		PositiveOffset,
+		PositiveBucketCounts,
+		NegativeOffset,
+		NegativeBucketCounts,
   	Exemplars.FilteredAttributes,
-	Exemplars.TimeUnix,
+		Exemplars.TimeUnix,
     Exemplars.Value,
     Exemplars.SpanId,
     Exemplars.TraceId,
-	Flags,
-	Min,
-	Max,
-	AggregationTemporality) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+		Flags,
+		Min,
+		Max,
+		AggregationTemporality) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 )
 
 type expHistogramModel struct {
@@ -134,7 +128,7 @@ func (e *expHistogramMetrics) insert(ctx context.Context, db *sql.DB) error {
 			scopeAttr := AttributesToMap(model.metadata.ScopeInstr.Attributes())
 			serviceName := GetServiceName(model.metadata.ResAttr)
 
-			for i := 0; i < model.expHistogram.DataPoints().Len(); i++ {
+			for i := range model.expHistogram.DataPoints().Len() {
 				dp := model.expHistogram.DataPoints().At(i)
 				attrs, times, values, traceIDs, spanIDs := convertExemplars(dp.Exemplars())
 				_, err = statement.ExecContext(ctx,
